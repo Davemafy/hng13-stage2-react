@@ -7,7 +7,7 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-function getAuthHeader() {
+function getAuthHeader(): Record<string, string> {
   const token = localStorage.getItem("ticketapp_session");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }

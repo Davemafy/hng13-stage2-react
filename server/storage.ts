@@ -75,7 +75,10 @@ export class MemStorage implements IStorage {
     const now = new Date();
     const ticket: Ticket = {
       id,
-      ...insertTicket,
+      title: insertTicket.title,
+      description: insertTicket.description || null,
+      status: insertTicket.status,
+      priority: insertTicket.priority || null,
       createdAt: now,
       updatedAt: now,
     };
@@ -91,7 +94,10 @@ export class MemStorage implements IStorage {
     
     const updated: Ticket = {
       ...existing,
-      ...insertTicket,
+      title: insertTicket.title,
+      description: insertTicket.description || null,
+      status: insertTicket.status,
+      priority: insertTicket.priority || null,
       updatedAt: new Date(),
     };
     this.tickets.set(id, updated);
