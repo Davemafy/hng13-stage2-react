@@ -18,6 +18,10 @@ externalPort = 80
 localPort = 37263
 externalPort = 3001
 
+[[ports]]
+localPort = 43425
+externalPort = 3000
+
 [env]
 PORT = "5000"
 
@@ -39,7 +43,8 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = " git push $GIT_URL"
+args = "npm run dev"
+waitForPort = 5000
 
 [[workflows.workflow]]
 name = "Git push"
