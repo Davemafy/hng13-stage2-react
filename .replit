@@ -39,8 +39,34 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev"
-waitForPort = 5000
+args = " git push $GIT_URL"
+
+[[workflows.workflow]]
+name = "Git push"
+mode = "sequential"
+author = 38696985
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = " git status"
+
+[[workflows.workflow]]
+name = "npm build"
+mode = "sequential"
+author = 38696985
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run build"
+
+[[workflows.workflow]]
+name = "Git status"
+mode = "sequential"
+author = 38696985
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "git status"
 
 [agent]
 integrations = ["javascript_mem_db:1.0.0"]
