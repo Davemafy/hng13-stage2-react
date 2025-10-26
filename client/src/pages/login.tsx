@@ -8,11 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 
 export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -27,24 +29,16 @@ export default function Login() {
   async function onSubmit(data: LoginData) {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+      const result = await login(data);
 
-      const result = await response.json();
-
-      if (!response.ok) {
+      if (!result.success) {
         toast({
           variant: "destructive",
           title: "Login failed",
-          description: result.message || "Invalid credentials. Please try again.",
+          description: result.error || "Invalid credentials. Please try again.",
         });
         return;
       }
-
-      localStorage.setItem("ticketapp_session", result.token);
       
       toast({
         title: "Login successful",
@@ -56,7 +50,7 @@ export default function Login() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to connect to server. Please try again.",
+        description: "An unexpected error occurred. Please try again.",
       });
     } finally {
       setIsLoading(false);

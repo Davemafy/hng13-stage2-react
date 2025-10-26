@@ -8,11 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { Eye, EyeOff, UserPlus } from "lucide-react";
 
 export default function Signup() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { signup } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -29,27 +31,16 @@ export default function Signup() {
   async function onSubmit(data: SignupData) {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: data.username,
-          password: data.password,
-        }),
-      });
+      const result = await signup(data);
 
-      const result = await response.json();
-
-      if (!response.ok) {
+      if (!result.success) {
         toast({
           variant: "destructive",
           title: "Signup failed",
-          description: result.message || "Username already exists. Please try another.",
+          description: result.error || "Username already exists. Please try another.",
         });
         return;
       }
-
-      localStorage.setItem("ticketapp_session", result.token);
       
       toast({
         title: "Account created",
@@ -61,7 +52,7 @@ export default function Signup() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to connect to server. Please try again.",
+        description: "An unexpected error occurred. Please try again.",
       });
     } finally {
       setIsLoading(false);

@@ -1,38 +1,41 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import * as localStore from "@/lib/localStore";
 import { Ticket, CheckCircle2, Clock, LogOut, LayoutDashboard } from "lucide-react";
 import type { Ticket as TicketType } from "@shared/schema";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { logout, user } = useAuth();
+  const [tickets, setTickets] = useState<TicketType[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("ticketapp_session");
-    if (!token) {
+    try {
+      const ticketData = localStore.getTickets();
+      setTickets(ticketData);
+    } catch (error) {
       toast({
         variant: "destructive",
-        title: "Unauthorized",
-        description: "Your session has expired — please log in again.",
+        title: "Error",
+        description: "Failed to load tickets",
       });
-      setLocation("/auth/login");
+    } finally {
+      setIsLoading(false);
     }
-  }, [setLocation, toast]);
-
-  const { data: tickets, isLoading } = useQuery<TicketType[]>({
-    queryKey: ["/api/tickets"],
-  });
+  }, [toast]);
 
   const totalTickets = tickets?.length || 0;
   const openTickets = tickets?.filter(t => t.status === "open").length || 0;
   const resolvedTickets = tickets?.filter(t => t.status === "closed").length || 0;
 
   const handleLogout = () => {
-    localStorage.removeItem("ticketapp_session");
+    logout();
     toast({
       title: "Logged out",
       description: "You have been successfully logged out.",
@@ -50,7 +53,12 @@ export default function Dashboard() {
               <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
                 <LayoutDashboard className="w-5 h-5 text-primary" aria-hidden="true" />
               </div>
-              <h1 className="text-xl font-bold text-card-foreground">TicketFlow</h1>
+              <div>
+                <h1 className="text-xl font-bold text-card-foreground">TicketFlow</h1>
+                {user && (
+                  <p className="text-xs text-muted-foreground">Welcome, {user.username}</p>
+                )}
+              </div>
             </div>
             <Button
               variant="outline"

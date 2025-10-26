@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertTicketSchema, type InsertTicket, type Ticket } from "@shared/schema";
@@ -13,7 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/contexts/AuthContext";
+import * as localStore from "@/lib/localStore";
 import { Plus, Edit, Trash2, ArrowLeft, AlertCircle } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
@@ -32,26 +32,43 @@ const priorityColors = {
 export default function Tickets() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("ticketapp_session");
-    if (!token) {
+    if (!isAuthenticated) {
       toast({
         variant: "destructive",
         title: "Unauthorized",
         description: "Your session has expired — please log in again.",
       });
       setLocation("/auth/login");
+      return;
     }
-  }, [setLocation, toast]);
 
-  const { data: tickets, isLoading } = useQuery<Ticket[]>({
-    queryKey: ["/api/tickets"],
-  });
+    loadTickets();
+  }, [isAuthenticated, setLocation, toast]);
+
+  const loadTickets = () => {
+    try {
+      const ticketData = localStore.getTickets();
+      setTickets(ticketData);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load tickets",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const createForm = useForm<InsertTicket>({
     resolver: zodResolver(insertTicketSchema),
@@ -73,71 +90,75 @@ export default function Tickets() {
     },
   });
 
-  const createMutation = useMutation({
-    mutationFn: async (data: InsertTicket) => {
-      return await apiRequest("POST", "/api/tickets", data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tickets"] });
+  const handleCreateTicket = async (data: InsertTicket) => {
+    setIsSubmitting(true);
+    try {
+      localStore.createTicket(data);
+      loadTickets();
       toast({
         title: "Success",
         description: "Ticket created successfully",
       });
       setCreateDialogOpen(false);
       createForm.reset();
-    },
-    onError: (error: any) => {
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to create ticket. Please try again.",
+        description: "Failed to create ticket. Please try again.",
       });
-    },
-  });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: InsertTicket }) => {
-      return await apiRequest("PATCH", `/api/tickets/${id}`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tickets"] });
+  const handleUpdateTicket = async (data: InsertTicket) => {
+    if (!selectedTicket) return;
+    
+    setIsSubmitting(true);
+    try {
+      localStore.updateTicket(selectedTicket.id, data);
+      loadTickets();
       toast({
         title: "Success",
         description: "Ticket updated successfully",
       });
       setEditDialogOpen(false);
       setSelectedTicket(null);
-    },
-    onError: (error: any) => {
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to update ticket. Please try again.",
+        description: "Failed to update ticket. Please try again.",
       });
-    },
-  });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return await apiRequest("DELETE", `/api/tickets/${id}`, {});
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tickets"] });
+  const handleDeleteTicket = async () => {
+    if (!selectedTicket) return;
+    
+    setIsSubmitting(true);
+    try {
+      localStore.deleteTicket(selectedTicket.id);
+      loadTickets();
       toast({
         title: "Success",
         description: "Ticket deleted successfully",
       });
       setDeleteDialogOpen(false);
       setSelectedTicket(null);
-    },
-    onError: (error: any) => {
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to delete ticket. Please try again.",
+        description: "Failed to delete ticket. Please try again.",
       });
-    },
-  });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleEdit = (ticket: Ticket) => {
     setSelectedTicket(ticket);
@@ -188,7 +209,7 @@ export default function Tickets() {
                   </DialogDescription>
                 </DialogHeader>
                 <Form {...createForm}>
-                  <form onSubmit={createForm.handleSubmit((data) => createMutation.mutate(data))} className="space-y-4">
+                  <form onSubmit={createForm.handleSubmit(handleCreateTicket)} className="space-y-4">
                     <FormField
                       control={createForm.control}
                       name="title"
@@ -283,10 +304,10 @@ export default function Tickets() {
                       </Button>
                       <Button
                         type="submit"
-                        disabled={createMutation.isPending}
+                        disabled={isSubmitting}
                         data-testid="button-submit-create"
                       >
-                        {createMutation.isPending ? "Creating..." : "Create Ticket"}
+                        {isSubmitting ? "Creating..." : "Create Ticket"}
                       </Button>
                     </DialogFooter>
                   </form>
@@ -389,7 +410,7 @@ export default function Tickets() {
             </DialogDescription>
           </DialogHeader>
           <Form {...editForm}>
-            <form onSubmit={editForm.handleSubmit((data) => selectedTicket && updateMutation.mutate({ id: selectedTicket.id, data }))} className="space-y-4">
+            <form onSubmit={editForm.handleSubmit(handleUpdateTicket)} className="space-y-4">
               <FormField
                 control={editForm.control}
                 name="title"
@@ -484,10 +505,10 @@ export default function Tickets() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={updateMutation.isPending}
+                  disabled={isSubmitting}
                   data-testid="button-submit-edit"
                 >
-                  {updateMutation.isPending ? "Updating..." : "Update Ticket"}
+                  {isSubmitting ? "Updating..." : "Update Ticket"}
                 </Button>
               </DialogFooter>
             </form>
@@ -507,11 +528,11 @@ export default function Tickets() {
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => selectedTicket && deleteMutation.mutate(selectedTicket.id)}
+              onClick={handleDeleteTicket}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid="button-confirm-delete"
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              {isSubmitting ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
